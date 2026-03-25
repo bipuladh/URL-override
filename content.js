@@ -1,7 +1,7 @@
 /**
- * OpenShift ImageRegistry Storage Override
+ * OpenShift ImageRegistry Error Injector
  * Intercepts fetch responses for imageregistry.operator.openshift.io/configs/cluster
- * and modifies the storage configuration to simulate no persistent storage.
+ * and returns an error response instead of the real data.
  */
 
 (function() {
@@ -32,66 +32,26 @@
       return response;
     }
 
-    try {
-      // Clone the response so we can read it without consuming the original
-      const clonedResponse = response.clone();
+    console.log('[ImageRegistry Override] ✓ Intercepted ImageRegistry config request');
+    console.log('[ImageRegistry Override] Returning error response instead of real data');
 
-      // Attempt to parse as JSON
-      const data = await clonedResponse.json();
+    // Return an error response instead of the actual data
+    const errorResponse = {
+      kind: "Status",
+      apiVersion: "v1",
+      metadata: {},
+      status: "Failure",
+      message: "Internal error occurred: ImageRegistry config intercepted by extension",
+      reason: "InternalError",
+      code: 500
+    };
 
-      console.log('[ImageRegistry Override] Original data:', JSON.parse(JSON.stringify(data)));
-
-      // Modify the storage configuration
-      const modifiedData = modifyImageRegistryStorage(data);
-
-      console.log('[ImageRegistry Override] Modified data:', JSON.parse(JSON.stringify(modifiedData)));
-      console.log('[ImageRegistry Override] ✓ Intercepted and modified storage configuration');
-
-      // Create a new response with modified data
-      return new Response(JSON.stringify(modifiedData), {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers
-      });
-    } catch (error) {
-      // If JSON parsing fails or any other error occurs, return the original response
-      console.warn('[ImageRegistry Override] Failed to parse or modify response:', error);
-      return response;
-    }
+    return new Response(JSON.stringify(errorResponse), {
+      status: 500,
+      statusText: "Internal Server Error",
+      headers: response.headers
+    });
   };
-
-  /**
-   * Modifies the ImageRegistry config to simulate no persistent storage
-   */
-  function modifyImageRegistryStorage(data) {
-    const modified = JSON.parse(JSON.stringify(data)); // Deep clone
-
-    // Remove all persistent storage configurations from spec
-    if (modified.spec && modified.spec.storage) {
-      const storageTypesToRemove = ['pvc', 's3', 'gcs', 'azure', 'swift', 'ibmcos', 'oss'];
-
-      storageTypesToRemove.forEach(type => {
-        delete modified.spec.storage[type];
-      });
-
-      // Set emptyDir to simulate ephemeral storage
-      modified.spec.storage.emptyDir = {};
-    }
-
-    // Remove all persistent storage configurations from status
-    if (modified.status && modified.status.storage) {
-      const storageTypesToRemove = ['pvc', 's3', 'gcs', 'azure', 'swift', 'ibmcos', 'oss'];
-
-      storageTypesToRemove.forEach(type => {
-        delete modified.status.storage[type];
-      });
-
-      // Set emptyDir in status to indicate ephemeral storage
-      modified.status.storage.emptyDir = {};
-    }
-
-    return modified;
-  }
 
   console.log('[ImageRegistry Override] Extension loaded and fetch interceptor active');
 })();

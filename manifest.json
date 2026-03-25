@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "OpenShift ImageRegistry Storage Override",
+  "name": "OpenShift ImageRegistry Error Injector",
   "version": "1.0.0",
-  "description": "Intercepts ImageRegistry API responses to simulate no persistent storage",
+  "description": "Intercepts ImageRegistry API responses and returns error instead of real data",
   "permissions": [],
   "content_scripts": [
     {
