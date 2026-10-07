@@ -1,57 +1,42 @@
 /**
- * OpenShift ImageRegistry Error Injector
- * Intercepts fetch responses for imageregistry.operator.openshift.io/configs/cluster
- * and returns an error response instead of the real data.
+ * OpenShift QE Extension
+ * Intercepts POST requests to /registry-checks and renames
+ * ImageRegistryURL → registryURL in the request body.
  */
 
 (function() {
   'use strict';
 
-  // Store the original fetch function
   const originalFetch = window.fetch;
 
-  // Override window.fetch
   window.fetch = async function(...args) {
-    // Call the original fetch
-    const response = await originalFetch.apply(this, args);
-
-    // Extract the URL from the arguments
     const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+    const options = typeof args[0] === 'string' ? (args[1] || {}) : args[0] || {};
 
-    // Log all imageregistry API calls for debugging
-    if (url.includes('imageregistry.operator.openshift.io')) {
-      console.log('[ImageRegistry Override] Detected imageregistry API call:', url);
+    // Intercept POST requests to /registry-checks
+    // Rename ImageRegistryURL → registryURL in the request body
+    if (url.endsWith('/registry-checks') && (options.method || '').toUpperCase() === 'POST' && options.body) {
+      try {
+        const body = JSON.parse(options.body);
+        if ('ImageRegistryURL' in body) {
+          console.log('[Registry Checks Override] ✓ Intercepted POST to /registry-checks');
+          console.log('[Registry Checks Override] Renaming ImageRegistryURL → registryURL');
+          body.registryURL = body.imageRegistryURL;
+          delete body.imageRegistryURL;
+          const newOptions = { ...options, body: JSON.stringify(body) };
+          if (typeof args[0] === 'string') {
+            return originalFetch.apply(this, [args[0], newOptions]);
+          } else {
+            return originalFetch.apply(this, [new Request(url, newOptions)]);
+          }
+        }
+      } catch (e) {
+        console.warn('[Registry Checks Override] Failed to parse request body:', e);
+      }
     }
 
-    // Check if this is an imageregistry config request
-    const isImageRegistryConfig =
-      url.includes('/apis/imageregistry.operator.openshift.io/') &&
-      url.includes('/configs/cluster');
-
-    if (!isImageRegistryConfig) {
-      return response;
-    }
-
-    console.log('[ImageRegistry Override] ✓ Intercepted ImageRegistry config request');
-    console.log('[ImageRegistry Override] Returning error response instead of real data');
-
-    // Return an error response instead of the actual data
-    const errorResponse = {
-      kind: "Status",
-      apiVersion: "v1",
-      metadata: {},
-      status: "Failure",
-      message: "Internal error occurred: ImageRegistry config intercepted by extension",
-      reason: "InternalError",
-      code: 500
-    };
-
-    return new Response(JSON.stringify(errorResponse), {
-      status: 500,
-      statusText: "Internal Server Error",
-      headers: response.headers
-    });
+    return originalFetch.apply(this, args);
   };
 
-  console.log('[ImageRegistry Override] Extension loaded and fetch interceptor active');
+  console.log('[Registry Checks Override] Extension loaded and watching for POST requests to /registry-checks');
 })();
