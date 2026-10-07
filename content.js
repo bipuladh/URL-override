@@ -15,10 +15,10 @@
 
     // Intercept POST requests to /registry-checks
     // Rename ImageRegistryURL → registryURL in the request body
-    if (url.endsWith('/registry-checks') && (options.method || '').toUpperCase() === 'POST' && options.body) {
+    if (url.includes('/registry-checks') && (options.method || '').toUpperCase() === 'POST' && options.body) {
       try {
         const body = JSON.parse(options.body);
-        if ('ImageRegistryURL' in body) {
+        if ('imageRegistryURL' in body) {
           console.log('[Registry Checks Override] ✓ Intercepted POST to /registry-checks');
           console.log('[Registry Checks Override] Renaming ImageRegistryURL → registryURL');
           body.registryURL = body.imageRegistryURL;
